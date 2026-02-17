@@ -1,0 +1,15 @@
+Have a few questions. 
+so the code finds representativein O(L^2), i don't now how lintables work but my guess is there is not an improvement better than L^2. 
+
+Somewhat sure we can get faster than that by just rewriting this in lower level language.
+
+Also, is this the longest step, wouldn't the diagonalization itself for each block be slower?
+
+Also, doesn't XXZ has inversion symmetry?
+
+also, though slower, working directly with roots of unity looks more "correct" than casting to floats) (i wont be doing that)
+
+
+We are not using any cores!!!!
+
+
