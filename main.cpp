@@ -18,11 +18,13 @@ auto wigner3j = gsl_sf_coupling_3j;
 #include <Spectra/SymEigsSolver.h>
 #include <Spectra/MatOp/SparseSymMatProd.h>
 
+
 #define push push_back
 #define pop pop_back
-// Assumes `s` is integer (for now)
 
-const sz N = 11; // |[s, s-1, ..., -s+1, -s]| = 2s + 1 = N, \sum_{m = -s}^s c^\dagger_m c_m = N  -- half-filling
+
+// Assumes `s` is integer (for now)
+const sz N = 5; // |[s, s-1, ..., -s+1, -s]| = 2s + 1 = N, \sum_{m = -s}^s c^\dagger_m c_m = N  -- half-filling
 const i32 M = 0; // \sum_{m = -s}^s m c^\dagger_m c_m 
 const i32 S = N / 2;
 
@@ -38,15 +40,18 @@ using table_t = std::array<std::array<std::array<std::array<f64, N>, N>, N>, N>;
 table_t makeCoefficients()
 {
 	table_t table;
+	i32 l;
+	f64 C1, C2;
 	for(i32 m1 = -S; m1 <= S; m1++)
 	for(i32 m2 = -S; m2 <= S; m2++)
 	for(i32 m3 = -S; m3 <= S; m3++)
 	for(i32 m4 = -S; m4 <= S; m4++)
 	{
 		if (m1 + m2 != m3 + m4) continue;
-		i32 l = 0;
-		f64 C1 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m1, 2*m2, 2*(-m1-m2)); 
-		f64 C2 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m4, 2*m3, 2*(-m3-m4)); 
+
+		l = 0;
+		C1 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m1, 2*m2, 2*(-m1-m2)); 
+		C2 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m4, 2*m3, 2*(-m3-m4)); 
 		table[m1+S][m2+S][m3+S][m4+S] += V0*f64(4*S-2*l-1)*C1*C2;
 
 		l = 1;
@@ -85,7 +90,7 @@ i32 getM(state_t up, state_t down)
 	i32 res = 0;
 	for(i32 m = 0; m < 2*S + 1; m++)
 	{
-		if ( (up >> m) & 1) res += (m - S);
+		if ( (up >> m) & 1)   res += (m - S);
 		if ( (down >> m) & 1) res += (m - S);
 	}
 
@@ -102,6 +107,9 @@ sz getParity(state_t state, sz m1, sz m2)
 i32 main()
 {
 	static_assert(2*S + 1 == N);
+	static_assert(N <= 15);
+	std::cout << "S = " << S << ", N = " << N << ", M = " << M << std::endl;
+
 	std::vector<std::pair<state_t, state_t>> states;
 	for(state_t up = 0; up < (state_t(1) << N); up++) for(state_t down = 0; down < (state_t(1) << N); down++)
 	{
@@ -117,6 +125,8 @@ i32 main()
 	for(sz index = 0; index < states.size(); index++)
 	{
 		auto [up, down] = states[index];
+
+		/*
 		for(i32 m = 0; m < 2*S + 1; m++)
 		{
 			// c^\dagger_{m,\uparrow}c_{m, \downarrow} + c^\dagger_{m,\downarrow} c_{m, \uparrow}
@@ -129,6 +139,7 @@ i32 main()
 			rows.push(index); cols.push(indexNext); data.push(-h);
 			rows.push(indexNext); cols.push(index); data.push(-h);
 		}
+		*/
 
 		for(i32 m1 = 0; m1 < 2*S + 1; m1++)
 		for(i32 m2 = 0; m2 < 2*S + 1; m2++)
@@ -191,7 +202,7 @@ i32 main()
 		
 	}
 
-	std::cout << "Number of entries in the Hamiltonian: " << data.size() << std::endl;
+	std::cout << "Number of computed entries: " << data.size() << std::endl;
 	// std::cout << rows << std::endl << cols << std::endl;
 	// std::cout << data << std::endl;
 
@@ -199,7 +210,7 @@ i32 main()
 	for(sz i = 0; i < rows.size(); i++) 
 		values[rows[i]*states.size() + cols[i]] += data[i];
 
-	std::cout << "Number of entries in the Hamiltonian: " << values.size() << std::endl;
+	std::cout << "Number of unique entries in the Hamiltonian: " << values.size() << std::endl;
 	std::vector<sz> rowsUnique, colsUnique;
 	std::vector<f64> dataUnique;
 
@@ -217,17 +228,17 @@ i32 main()
 	std::vector<Eigen::Triplet<f64>> triplets;
 	for (sz i = 0; i < rowsUnique.size(); ++i) triplets.push_back(Eigen::Triplet<f64>(rowsUnique[i], colsUnique[i], dataUnique[i]));
 	sparse.setFromTriplets(triplets.begin(), triplets.end());
-	/*
-	Eigen::MatrixXd dense = Eigen::MatrixXd(sparse);
+	
+	Eigen::MatrixXd dense = sparse;
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solverDense(dense);
 	std::vector<f64> eigenvaluesDense(nEigenvalues);
-	for(sz i = 0; i < nEigenvalues; i++) eigenvaluesDense[i] = solverDense.eigenvalues()[i]/f64(N);	
+	for(sz i = 0; i < nEigenvalues; i++) eigenvaluesDense[i] = solverDense.eigenvalues()[i];
 	std::cout << "Eigenvalues (Eigen): " << eigenvaluesDense << std::endl;
-	*/
+
 	Spectra::SparseSymMatProd<f64> op(sparse);
-	Spectra::SymEigsSolver<Spectra::SparseSymMatProd<f64>> solver(op, nEigenvalues, 4*nEigenvalues); solver.init();
+	Spectra::SymEigsSolver<Spectra::SparseSymMatProd<f64>> solver(op, nEigenvalues, 8*nEigenvalues); solver.init();
 	solver.compute(Spectra::SortRule::SmallestAlge);
 	std::vector<f64> eigenvalues(nEigenvalues); 
-	for(sz i = 0; i < nEigenvalues; i++) eigenvalues[nEigenvalues - i - 1] = solver.eigenvalues()[i]/f64(N);	
+	for(sz i = 0; i < nEigenvalues; i++) eigenvalues[nEigenvalues - i - 1] = solver.eigenvalues()[i];	
 	std::cout << "Eigenvalues (SPECTRA): " << eigenvalues << std::endl;
 }
