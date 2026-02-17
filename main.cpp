@@ -6,6 +6,7 @@
 #include <array>
 #include <vector>
 #include <unordered_map>
+#include <algorithm>
 
 namespace gsl
 {
@@ -39,7 +40,7 @@ using table_t = std::array<std::array<std::array<std::array<f64, N>, N>, N>, N>;
 
 table_t makeCoefficients()
 {
-	table_t table;
+	table_t table{};
 	i32 l;
 	f64 C1, C2;
 	for(i32 m1 = -S; m1 <= S; m1++)
@@ -146,9 +147,10 @@ i32 main()
 		for(i32 m1 = 0; m1 < 2*S + 1; m1++)
 		for(i32 m2 = 0; m2 < 2*S + 1; m2++)
 		for(i32 m3 = 0; m3 < 2*S + 1; m3++)
-		for(i32 m4 = 0; m4 < 2*S + 1; m4++)
 		{
-			if (m1 + m2 != m3 + m4) continue;
+			i32 m4 = m1 + m2 - m3; 
+			if(m1 + m2 < 0 or m4 >= 2*S+1) continue;
+			// if (m1 + m2 != m3 + m4) continue;
 
 			f64 coefficient = V[m1][m2][m3][m4];
 
