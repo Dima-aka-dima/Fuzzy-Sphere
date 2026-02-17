@@ -105,8 +105,7 @@ i32 main()
 	std::vector<std::pair<state_t, state_t>> states;
 	for(state_t up = 0; up < (state_t(1) << N); up++) for(state_t down = 0; down < (state_t(1) << N); down++)
 	{
-		if(getN(up, down) == N and getM(up, down) == M)
-			states.push({up, down});
+		if(getN(up, down) == N and getM(up, down) == M) states.push({up, down});
 	}
 
 	std::cout << "Number of states: " <<states.size() << std::endl;
@@ -120,6 +119,7 @@ i32 main()
 		auto [up, down] = states[index];
 		for(i32 m = 0; m < 2*S + 1; m++)
 		{
+			// c^\dagger_{m,\uparrow}c_{m, \downarrow} + c^\dagger_{m,\downarrow} c_{m, \uparrow}
 			if(get(up, m) == get(down, m)) continue;
 
 			state_t upNext = flip(up, m); 
@@ -136,12 +136,19 @@ i32 main()
 		for(i32 m4 = 0; m4 < 2*S + 1; m4++)
 		{
 			if (m1 + m2 != m3 + m4) continue;
-			
+
 			f64 coefficient = V[m1][m2][m3][m4];
 
 			if(m1 == m4) // m2 == m3
 			{
+				// c^\dagger_{m_1,\downarrow} c_{m_1,\downarrow} c^\dagger_{m_2,\uparrow} c_{m_2,\uparrow}
 				if(get(up, m2) and get(down, m1))
+				{
+					rows.push(index); cols.push(index); data.push(coefficient);
+				}
+				
+				// c^\dagger_{m_1,\uparrow} c_{m_1,\uparrow} c^\dagger_{m_2,\downarrow} c_{m_2,\downarrow}
+				if(get(down, m2) and get(up, m1))
 				{
 					rows.push(index); cols.push(index); data.push(coefficient);
 				}
