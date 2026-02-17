@@ -26,9 +26,9 @@ const sz N = 11; // |[s, s-1, ..., -s+1, -s]| = 2s + 1 = N, \sum_{m = -s}^s c^\d
 const i32 M = 0; // \sum_{m = -s}^s m c^\dagger_m c_m 
 const i32 S = N / 2;
 
-const f64 h = 3.16;
+const f64 h = 0.0;
 const f64 V0 = 1.0;
-const f64 V1 = 4.75;
+const f64 V1 = 4.0;
 
 
 using state_t = u32; // [s, s-1, ..., -s+1, -s]
@@ -67,13 +67,6 @@ state_t set(state_t state, sz index, bool value) { return (state & ~(state_t(1) 
 
 state_t flip(state_t state, sz index){ return state ^ (state_t(1) << index); }
 
-/*
-template<typename T>
-sz getIndex(std::vector<T>& states, T state)
-{
-	return std::distance(states.begin(), std::find(states.begin(), states.end(), state));
-}
-*/
 
 // Comparison is correctly overloaded for std::pair by default
 template<typename T>
@@ -97,6 +90,13 @@ i32 getM(state_t up, state_t down)
 	}
 
 	return res;
+}
+
+sz getParity(state_t state, sz m1, sz m2)
+{
+	sz parity = 0;
+	for (sz i = (m1 < m2 ? m1 : m2) + 1; i < (m1 < m2 ? m2 : m1); ++i) if (get(state, i)) parity++;
+	return parity;
 }
 
 i32 main()
@@ -139,35 +139,45 @@ i32 main()
 			
 			f64 coefficient = V[m1][m2][m3][m4];
 
-			if((m2 != m3 and get(up, m3) and not get(up, m2)) or (m2 == m3 and get(up, m2)))
+			if(m1 == m4) // m2 == m3
 			{
-				state_t upNext = (m2 == m3) ? up : set(set(up, m3, 0), m2, 1);
-
-				if((m1 != m4 and get(down, m4) and not get(down, m1)) or (m1 == m4 and get(down, m1)))
+				if(get(up, m2) and get(down, m1))
 				{
-					state_t downNext = (m1 == m4) ? down : set(set(down, m4, 0), m1, 1);
-
-					sz indexNext = getIndex(states, {upNext, downNext});
-					
-					rows.push(index); cols.push(indexNext); data.push(coefficient);
-					rows.push(indexNext); cols.push(index); data.push(coefficient);
+					rows.push(index); cols.push(index); data.push(coefficient);
 				}
+				continue;
+			}
+
+			// c^\dagger_{m_1,\downarrow} c_{m_4,\downarrow} c^\dagger_{m_2,\uparrow} c_{m_3,\uparrow}
+			if(get(up,   m3) and not get(up,   m2) and\
+			   get(down, m4) and not get(down, m1))
+			{
+				state_t downNext = set(set(down, m4, 0), m1, 1);
+				state_t upNext   = set(set(up,   m3, 0), m2, 1);
+
+				sz parity = getParity(down, m1, m4) + getParity(up, m2, m3);
+				f64 phase = (parity % 2) ? -1.0 : 1.0;
+
+				sz indexNext = getIndex(states, {upNext, downNext});
+				
+				rows.push(index); cols.push(indexNext); data.push(phase*coefficient);
+				rows.push(indexNext); cols.push(index); data.push(phase*coefficient);
 			}
 			
-			// if(m1 == m2 and m3 == m4) continue;
-
-			if((m2 != m3 and get(down, m3) and not get(down, m2)) or (m2 == m3 and get(down, m2)))
+			// c^\dagger_{m_1,\uparrow} c_{m_4,\uparrow} c^\dagger_{m_2,\downarrow} c_{m_3,\downarrow}
+			if(get(down, m3) and not get(down, m2) and\
+			   get(up,   m4) and not get(up,   m1))
 			{
-				state_t downNext = (m2 == m3) ? down : set(set(down, m3, 0), m2, 1);
+				state_t downNext = set(set(down, m3, 0), m2, 1);
+				state_t upNext   = set(set(up,   m4, 0), m1, 1);
 
-				if((m1 != m4 and get(up, m4) and not get(up, m1)) or (m1 == m4 and get(up, m1)))
-				{
-					state_t upNext = (m1 == m4) ? up : set(set(up, m4, 0), m1, 1);
-					sz indexNext = getIndex(states, {upNext, downNext});
-					
-					rows.push(index); cols.push(indexNext); data.push(coefficient);
-					rows.push(indexNext); cols.push(index); data.push(coefficient);
-				}
+				sz parity = getParity(up, m1, m4) + getParity(down, m2, m3);
+				f64 phase = (parity % 2) ? -1.0 : 1.0;
+
+				sz indexNext = getIndex(states, {upNext, downNext});
+				
+				rows.push(index); cols.push(indexNext); data.push(phase*coefficient);
+				rows.push(indexNext); cols.push(index); data.push(phase*coefficient);
 			}
 
 		}
