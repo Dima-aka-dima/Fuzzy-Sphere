@@ -24,7 +24,7 @@ auto wigner3j = gsl_sf_coupling_3j;
 
 
 // Assumes `s` is integer (for now)
-const sz N = 5; // |[s, s-1, ..., -s+1, -s]| = 2s + 1 = N, \sum_{m = -s}^s c^\dagger_m c_m = N  -- half-filling
+const sz N = 11; // |[s, s-1, ..., -s+1, -s]| = 2s + 1 = N, \sum_{m = -s}^s c^\dagger_m c_m = N  -- half-filling
 const i32 M = 0; // \sum_{m = -s}^s m c^\dagger_m c_m 
 const i32 S = N / 2;
 
@@ -100,7 +100,9 @@ i32 getM(state_t up, state_t down)
 sz getParity(state_t state, sz m1, sz m2)
 {
 	sz parity = 0;
-	for (sz i = (m1 < m2 ? m1 : m2) + 1; i < (m1 < m2 ? m2 : m1); ++i) if (get(state, i)) parity++;
+	if(m1 > m2) std::swap(m1, m2);
+	for(sz i = m1 + 1; i < m2; ++i) if(get(state, i)) parity++;
+	// for (sz i = (m1 < m2 ? m1 : m2) + 1; i < (m1 < m2 ? m2 : m1); ++i) if (get(state, i)) parity++;
 	return parity;
 }
 
@@ -163,6 +165,7 @@ i32 main()
 				{
 					rows.push(index); cols.push(index); data.push(coefficient);
 				}
+
 				continue;
 			}
 
@@ -179,7 +182,7 @@ i32 main()
 				sz indexNext = getIndex(states, {upNext, downNext});
 				
 				rows.push(index); cols.push(indexNext); data.push(phase*coefficient);
-				rows.push(indexNext); cols.push(index); data.push(phase*coefficient);
+				// rows.push(indexNext); cols.push(index); data.push(phase*coefficient);
 			}
 			
 			// c^\dagger_{m_1,\uparrow} c_{m_4,\uparrow} c^\dagger_{m_2,\downarrow} c_{m_3,\downarrow}
@@ -195,7 +198,7 @@ i32 main()
 				sz indexNext = getIndex(states, {upNext, downNext});
 				
 				rows.push(index); cols.push(indexNext); data.push(phase*coefficient);
-				rows.push(indexNext); cols.push(index); data.push(phase*coefficient);
+				// rows.push(indexNext); cols.push(index); data.push(phase*coefficient);
 			}
 
 		}
@@ -228,14 +231,15 @@ i32 main()
 	std::vector<Eigen::Triplet<f64>> triplets;
 	for (sz i = 0; i < rowsUnique.size(); ++i) triplets.push_back(Eigen::Triplet<f64>(rowsUnique[i], colsUnique[i], dataUnique[i]));
 	sparse.setFromTriplets(triplets.begin(), triplets.end());
-	
+
+	/*
 	Eigen::MatrixXd dense = sparse;
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solverDense(dense);
 	std::vector<f64> eigenvaluesDense(nEigenvalues);
 	for(sz i = 0; i < nEigenvalues; i++) eigenvaluesDense[i] = solverDense.eigenvalues()[i];
 	std::cout << "Eigenvalues (Eigen): " << eigenvaluesDense << std::endl;
 	return 0;
-
+*/
 	Spectra::SparseSymMatProd<f64> op(sparse);
 	Spectra::SymEigsSolver<Spectra::SparseSymMatProd<f64>> solver(op, nEigenvalues, 8*nEigenvalues); solver.init();
 	solver.compute(Spectra::SortRule::SmallestAlge);
