@@ -52,12 +52,12 @@ table_t makeCoefficients()
 		l = 0;
 		C1 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m1, 2*m2, 2*(-m1-m2)); 
 		C2 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m4, 2*m3, 2*(-m3-m4)); 
-		table[m1+S][m2+S][m3+S][m4+S] += V0*f64(4*S-2*l-1)*C1*C2;
+		table[m1+S][m2+S][m3+S][m4+S] += V0*f64(4*S-2*l+1)*C1*C2;
 
 		l = 1;
 		C1 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m1, 2*m2, 2*(-m1-m2)); 
 		C2 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m4, 2*m3, 2*(-m3-m4)); 
-		table[m1+S][m2+S][m3+S][m4+S] += V1*f64(4*S-2*l-1)*C1*C2;
+		table[m1+S][m2+S][m3+S][m4+S] += V1*f64(4*S-2*l+1)*C1*C2;
 	}	
 
 	return table;
@@ -222,7 +222,7 @@ i32 main()
 	}
 
 
-	sz nEigenvalues = 5;
+	sz nEigenvalues = 6;
 	
 	Eigen::SparseMatrix<f64> sparse(states.size(), states.size());
 	std::vector<Eigen::Triplet<f64>> triplets;
@@ -234,6 +234,7 @@ i32 main()
 	std::vector<f64> eigenvaluesDense(nEigenvalues);
 	for(sz i = 0; i < nEigenvalues; i++) eigenvaluesDense[i] = solverDense.eigenvalues()[i];
 	std::cout << "Eigenvalues (Eigen): " << eigenvaluesDense << std::endl;
+	return 0;
 
 	Spectra::SparseSymMatProd<f64> op(sparse);
 	Spectra::SymEigsSolver<Spectra::SparseSymMatProd<f64>> solver(op, nEigenvalues, 8*nEigenvalues); solver.init();
