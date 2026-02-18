@@ -53,12 +53,12 @@ table_t makeCoefficients()
 		l = 0;
 		C1 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m1, 2*m2, 2*(-m1-m2)); 
 		C2 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m4, 2*m3, 2*(-m3-m4)); 
-		table[m1+S][m2+S][m3+S][m4+S] += V0*f64(4*S-2*l+1)*C1*C2;
+		table[m1+S][m2+S][m3+S][m4+S] += 2*V0*f64(4*S-2*l+1)*C1*C2;
 
 		l = 1;
 		C1 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m1, 2*m2, 2*(-m1-m2)); 
 		C2 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m4, 2*m3, 2*(-m3-m4)); 
-		table[m1+S][m2+S][m3+S][m4+S] += V1*f64(4*S-2*l+1)*C1*C2;
+		table[m1+S][m2+S][m3+S][m4+S] += 2*V1*f64(4*S-2*l+1)*C1*C2;
 	}	
 
 	return table;
@@ -155,7 +155,7 @@ i32 main()
 			}
 		}
 		
-		rows.push(index); cols.push(index); data.push(2*diagonal);
+		rows.push(index); cols.push(index); data.push(diagonal);
 		
 		for(i32 m1 = 0; m1 < N; m1++)
 		for(i32 m2 = 0; m2 < N; m2++)
@@ -179,7 +179,7 @@ i32 main()
 				
 				sz indexNext = getIndex(states, {upNext, downNext});
 				
-				rows.push(index); cols.push(indexNext); data.push(2*phase*coefficient);
+				rows.push(index); cols.push(indexNext); data.push(phase*coefficient);
 			}
 		}
 		
