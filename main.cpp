@@ -124,7 +124,6 @@ i32 main()
 	std::vector<sz> rows, cols;
 	std::vector<f64> data;
 
-	sz countDiagonal = 0, countSymmetric = 0, countGeneral = 0;
 	for(sz index = 0; index < states.size(); index++)
 	{
 		auto [up, down] = states[index];
@@ -156,7 +155,6 @@ i32 main()
 			}
 		}
 		
-		countDiagonal++;
 		rows.push(index); cols.push(index); data.push(2*diagonal);
 		
 		for(i32 m1 = 0; m1 < N; m1++)
@@ -168,15 +166,12 @@ i32 main()
 			i32 m4 = m1 + m2 - m3; 
 			if(m4 < 0 or m4 >= N) continue;
 
-
 			// c^\dagger_{m_1,\downarrow} c_{m_4,\downarrow} c^\dagger_{m_2,\uparrow} c_{m_3,\uparrow}
 			if(get(up,   m3) and not get(up,   m2) and\
 			   get(down, m4) and not get(down, m1))
 			{
 				state_t downNext = flip(flip(down, m4), m1);
 				state_t upNext   = flip(flip(up  , m3), m2);
-				// state_t downNext = set(set(down, m4, 0), m1, 1);
-				// state_t upNext   = set(set(up,   m3, 0), m2, 1);
 
 				sz parity = getParity(down, m1, m4) + getParity(up, m2, m3);
 				f64 phase = (parity % 2) ? -1.0 : 1.0;
@@ -184,37 +179,19 @@ i32 main()
 				
 				sz indexNext = getIndex(states, {upNext, downNext});
 				
-				countGeneral++;
 				rows.push(index); cols.push(indexNext); data.push(2*phase*coefficient);
 			}
 		}
 		
 	}
-
-	std::cout << "Number of computed entries: " << data.size() << std::endl;
-	std::cout << "Counts: " << countDiagonal << " "\
-							<< countSymmetric << " "\
-							<< countGeneral << std::endl;
-	std::unordered_map<sz, f64> values;
-	for(sz i = 0; i < rows.size(); i++) 
-		values[rows[i]*states.size() + cols[i]] += data[i];
-
-	std::cout << "Number of unique entries in the Hamiltonian: " << values.size() << std::endl;
-	std::vector<sz> rowsUnique, colsUnique;
-	std::vector<f64> dataUnique;
-
-	for(auto [ind, value]: values)
-	{
-		rowsUnique.push(ind / states.size());
-		colsUnique.push(ind % states.size());
-		dataUnique.push(value);
-	}
+	
+	std::cout << "Number of entries in the Hamiltonian: " << data.size() << std::endl;
 
 	sz nEigenvalues = 6;
 	
 	Eigen::SparseMatrix<f64> sparse(states.size(), states.size());
 	std::vector<Eigen::Triplet<f64>> triplets;
-	for (sz i = 0; i < rowsUnique.size(); ++i) triplets.push_back(Eigen::Triplet<f64>(rowsUnique[i], colsUnique[i], dataUnique[i]));
+	for (sz i = 0; i < rows.size(); ++i) triplets.push_back(Eigen::Triplet<f64>(rows[i], cols[i], data[i]));
 	sparse.setFromTriplets(triplets.begin(), triplets.end());
 
 	/*
@@ -224,7 +201,8 @@ i32 main()
 	for(sz i = 0; i < nEigenvalues; i++) eigenvaluesDense[i] = solverDense.eigenvalues()[i];
 	std::cout << "Eigenvalues (Eigen): " << eigenvaluesDense << std::endl;
 	return 0;
-*/
+	*/
+
 	Spectra::SparseSymMatProd<f64> op(sparse);
 	Spectra::SymEigsSolver<Spectra::SparseSymMatProd<f64>> solver(op, nEigenvalues, 8*nEigenvalues); solver.init();
 	solver.compute(Spectra::SortRule::SmallestAlge);
