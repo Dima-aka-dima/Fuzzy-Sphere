@@ -25,11 +25,11 @@ auto wigner3j = gsl_sf_coupling_3j;
 
 
 // Assumes `s` is integer (for now)
-const sz N = 11; // |[s, s-1, ..., -s+1, -s]| = 2s + 1 = N, \sum_{m = -s}^s c^\dagger_m c_m = N  -- half-filling
+const i32 N = 11; // |[s, s-1, ..., -s+1, -s]| = 2s + 1 = N, \sum_{m = -s}^s c^\dagger_m c_m = N  -- half-filling
 const i32 M = 0; // \sum_{m = -s}^s m c^\dagger_m c_m 
 const i32 S = N / 2;
 
-const f64 h = 0.0;
+const f64 h = 1.0;
 const f64 V0 = 1.0;
 const f64 V1 = 4.0;
 
@@ -89,9 +89,9 @@ sz getN(state_t up, state_t down)
 i32 getM(state_t up, state_t down)
 {
 	i32 res = 0;
-	for(i32 m = 0; m < 2*S + 1; m++)
+	for(i32 m = 0; m < 2*S+1; m++)
 	{
-		if ( (up >> m) & 1)   res += (m - S);
+		if ( (up   >> m) & 1) res += (m - S);
 		if ( (down >> m) & 1) res += (m - S);
 	}
 
@@ -109,28 +109,27 @@ sz getParity(state_t state, sz m1, sz m2)
 
 i32 main()
 {
-	static_assert(2*S + 1 == N);
+	static_assert(2*S+1 == N);
 	static_assert(N <= 15);
 	std::cout << "S = " << S << ", N = " << N << ", M = " << M << std::endl;
-
+	
 	std::vector<std::pair<state_t, state_t>> states;
 	for(state_t up = 0; up < (state_t(1) << N); up++) for(state_t down = 0; down < (state_t(1) << N); down++)
 	{
 		if(getN(up, down) == N and getM(up, down) == M) states.push({up, down});
 	}
 
-	std::cout << "Number of states: " <<states.size() << std::endl;
-	// for(auto [up, down]: states) std::cout << "|" << std::bitset<N>(up) << "|" << std::bitset<N>(down) << "|" << std::endl;
+	std::cout << "Number of states: " << states.size() << std::endl;
 
 	std::vector<sz> rows, cols;
 	std::vector<f64> data;
 
+	sz countDiagonal = 0, countSymmetric = 0, countGeneral = 0;
 	for(sz index = 0; index < states.size(); index++)
 	{
 		auto [up, down] = states[index];
-
 		/*
-		for(i32 m = 0; m < 2*S + 1; m++)
+		for(i32 m = 0; m < N; m++)
 		{
 			// c^\dagger_{m,\uparrow}c_{m, \downarrow} + c^\dagger_{m,\downarrow} c_{m, \uparrow}
 			if(get(up, m) == get(down, m)) continue;
@@ -140,77 +139,62 @@ i32 main()
 			sz indexNext = getIndex(states, {upNext, downNext});
 
 			rows.push(index); cols.push(indexNext); data.push(-h);
-			rows.push(indexNext); cols.push(index); data.push(-h);
+			// rows.push(indexNext); cols.push(index); data.push(-h);
 		}
 		*/
 
-		for(i32 m1 = 0; m1 < 2*S + 1; m1++)
-		for(i32 m2 = 0; m2 < 2*S + 1; m2++)
-		for(i32 m3 = 0; m3 < 2*S + 1; m3++)
+		// Diagonal loop, (m1 == m4) => (m2 == m3)
+		f64 diagonal = 0;
+		for(i32 m1 = 0; m1 < N; m1++)
+		for(i32 m2 = 0; m2 < N; m2++)
 		{
-			i32 m4 = m1 + m2 - m3; 
-			if(m1 + m2 < 0 or m4 >= 2*S+1) continue;
-			// if (m1 + m2 != m3 + m4) continue;
-
-			f64 coefficient = V[m1][m2][m3][m4];
-
-			if(m1 == m4) // m2 == m3
+			// c^\dagger_{m_1,\downarrow} c_{m_1,\downarrow} c^\dagger_{m_2,\uparrow} c_{m_2,\uparrow}
+			if(get(up, m2) and get(down, m1))
 			{
-				// c^\dagger_{m_1,\downarrow} c_{m_1,\downarrow} c^\dagger_{m_2,\uparrow} c_{m_2,\uparrow}
-				if(get(up, m2) and get(down, m1))
-				{
-					rows.push(index); cols.push(index); data.push(coefficient);
-				}
-				
-				// c^\dagger_{m_1,\uparrow} c_{m_1,\uparrow} c^\dagger_{m_2,\downarrow} c_{m_2,\downarrow}
-				if(get(down, m2) and get(up, m1))
-				{
-					rows.push(index); cols.push(index); data.push(coefficient);
-				}
-
-				continue;
+				f64 coefficient = V[m1][m2][m2][m1];
+				diagonal += coefficient;
 			}
+		}
+		
+		countDiagonal++;
+		rows.push(index); cols.push(index); data.push(2*diagonal);
+		
+		for(i32 m1 = 0; m1 < N; m1++)
+		for(i32 m2 = 0; m2 < N; m2++)
+		for(i32 m3 = 0; m3 < N; m3++)
+		{
+			if(m2 == m3) continue;
+
+			i32 m4 = m1 + m2 - m3; 
+			if(m4 < 0 or m4 >= N) continue;
+
 
 			// c^\dagger_{m_1,\downarrow} c_{m_4,\downarrow} c^\dagger_{m_2,\uparrow} c_{m_3,\uparrow}
 			if(get(up,   m3) and not get(up,   m2) and\
 			   get(down, m4) and not get(down, m1))
 			{
-				state_t downNext = set(set(down, m4, 0), m1, 1);
-				state_t upNext   = set(set(up,   m3, 0), m2, 1);
+				state_t downNext = flip(flip(down, m4), m1);
+				state_t upNext   = flip(flip(up  , m3), m2);
+				// state_t downNext = set(set(down, m4, 0), m1, 1);
+				// state_t upNext   = set(set(up,   m3, 0), m2, 1);
 
 				sz parity = getParity(down, m1, m4) + getParity(up, m2, m3);
 				f64 phase = (parity % 2) ? -1.0 : 1.0;
-
+				f64 coefficient = V[m1][m2][m3][m4];
+				
 				sz indexNext = getIndex(states, {upNext, downNext});
 				
-				rows.push(index); cols.push(indexNext); data.push(phase*coefficient);
-				// rows.push(indexNext); cols.push(index); data.push(phase*coefficient);
+				countGeneral++;
+				rows.push(index); cols.push(indexNext); data.push(2*phase*coefficient);
 			}
-			
-			// c^\dagger_{m_1,\uparrow} c_{m_4,\uparrow} c^\dagger_{m_2,\downarrow} c_{m_3,\downarrow}
-			if(get(down, m3) and not get(down, m2) and\
-			   get(up,   m4) and not get(up,   m1))
-			{
-				state_t downNext = set(set(down, m3, 0), m2, 1);
-				state_t upNext   = set(set(up,   m4, 0), m1, 1);
-
-				sz parity = getParity(up, m1, m4) + getParity(down, m2, m3);
-				f64 phase = (parity % 2) ? -1.0 : 1.0;
-
-				sz indexNext = getIndex(states, {upNext, downNext});
-				
-				rows.push(index); cols.push(indexNext); data.push(phase*coefficient);
-				// rows.push(indexNext); cols.push(index); data.push(phase*coefficient);
-			}
-
 		}
 		
 	}
 
 	std::cout << "Number of computed entries: " << data.size() << std::endl;
-	// std::cout << rows << std::endl << cols << std::endl;
-	// std::cout << data << std::endl;
-
+	std::cout << "Counts: " << countDiagonal << " "\
+							<< countSymmetric << " "\
+							<< countGeneral << std::endl;
 	std::unordered_map<sz, f64> values;
 	for(sz i = 0; i < rows.size(); i++) 
 		values[rows[i]*states.size() + cols[i]] += data[i];
@@ -225,7 +209,6 @@ i32 main()
 		colsUnique.push(ind % states.size());
 		dataUnique.push(value);
 	}
-
 
 	sz nEigenvalues = 6;
 	
@@ -248,4 +231,6 @@ i32 main()
 	std::vector<f64> eigenvalues(nEigenvalues); 
 	for(sz i = 0; i < nEigenvalues; i++) eigenvalues[nEigenvalues - i - 1] = solver.eigenvalues()[i];	
 	std::cout << "Eigenvalues (SPECTRA): " << eigenvalues << std::endl;
+
+	
 }
