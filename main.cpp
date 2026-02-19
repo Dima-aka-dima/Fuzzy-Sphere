@@ -25,7 +25,7 @@ auto wigner3j = gsl_sf_coupling_3j;
 
 
 // Assumes `s` is integer (for now)
-const i32 N = 5; // |[s, s-1, ..., -s+1, -s]| = 2s + 1 = N, \sum_{m = -s}^s c^\dagger_m c_m = N  -- half-filling
+const i32 N = 11; // |[s, s-1, ..., -s+1, -s]| = 2s + 1 = N, \sum_{m = -s}^s c^\dagger_m c_m = N  -- half-filling
 const i32 M = 0; // \sum_{m = -s}^s m c^\dagger_m c_m 
 const i32 S = N / 2;
 
@@ -59,7 +59,6 @@ table_t makeCoefficients()
 		C1 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m1, 2*m2, 2*(-m1-m2)); 
 		C2 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m4, 2*m3, 2*(-m3-m4)); 
 		table[m1+S][m2+S][m3+S][m4+S] += 2*V1*f64(4*S-2*l+1)*C1*C2;
-		// std::cout << table[m1+S][m2+S][m3+S][m4+S] << std::endl;
 	}	
 
 	return table;
@@ -100,32 +99,12 @@ i32 getM(state_t up, state_t down)
 }
 
 // m != n
-sz getPhase(state_t state, sz m, sz n)
-{
-	if(m > n) std::swap(m, n);
-	state_t mask = ((state_t(1) << (m+1)) - 1) ^ ((state_t(1) << n) - 1);
-	state &= mask;
-	return std::popcount(state);
-}
-
 sz getPhase(state_t up, state_t down, sz m, sz n)
 {
 	if(m > n) std::swap(m, n);
 	state_t mask = ((state_t(1) << (m+1)) - 1) ^ ((state_t(1) << n) - 1);
-	// return std::popcount((up & mask) | (down & mask));
-	return std::popcount((up | down) & mask);
+	return std::popcount((up ^ down) & mask);
 }
-
-/*
-sz getPhase(state_t state, sz m1, sz m2)
-{
-	sz parity = 0;
-	if(m1 > m2) std::swap(m1, m2);
-	for(sz i = m1+1; i < m2; ++i) if(get(state, i)) parity++;
-	// for (sz i = (m1 < m2 ? m1 : m2) + 1; i < (m1 < m2 ? m2 : m1); ++i) if (get(state, i)) parity++;
-	return parity;
-}
-*/
 
 bool isUnique(std::vector<sz>& rows, std::vector<sz>& cols, sz n)
 {
@@ -223,10 +202,8 @@ i32 main()
 				state_t downNext = flip(flip(down, m4), m1);
 				state_t upNext   = flip(flip(up  , m3), m2);
 
-				sz phase1 = getPhase(down, m2, m3) + getPhase(up, m2, m3) + sz(get(down, std::min(m2, m3)));
-				sz phase2 = getPhase(down, m1, m4) + getPhase(upNext, m1, m4) + sz(get(upNext, std::max(m1, m4)));
-				// sz phase1 = getPhase(up, down, m2, m3) + sz(get(down, std::min(m2, m3)));
-				// sz phase2 = getPhase(upNext, down, m1, m4) + sz(get(upNext, std::max(m1, m4)));
+				sz phase1 = getPhase(up, down, m2, m3) + sz(get(down, std::min(m2, m3)));
+				sz phase2 = getPhase(upNext, down, m1, m4) + sz(get(upNext, std::max(m1, m4)));
 				sz phase = phase1 + phase2;
 				f64 parity = (phase % 2) ? -1.0 : 1.0;
 				f64 coefficient = V[m1][m2][m3][m4];
@@ -236,26 +213,6 @@ i32 main()
 				rows.push(index); cols.push(indexNext); data.push(parity*coefficient);
 			}
 		
-			/*
-			// c^\dagger_{m_1,\uparrow} c_{m_4,\uparrow} c^\dagger_{m_2,\downarrow} c_{m_3,\downarrow}
-			if(get(up,   m4) and not get(up,   m1) and\
-			   get(down, m3) and not get(down, m2))
-			{
-				state_t downNext = flip(flip(down, m2), m3);
-				state_t upNext   = flip(flip(up  , m1), m4);
-
-				// sz phase = getPhase(down, m1, m4) + getPhase(up, m2, m3);
-				sz phase1 = getPhase(down, m2, m3) + getPhase(up, m2, m3) + sz(get(up, std::max(m2, m3)));
-				sz phase2 = getPhase(downNext, m1, m4) + getPhase(up, m1, m4) + sz(get(downNext, std::min(m1, m4)));
-				sz phase = phase1 + phase2;
-				f64 parity = (phase % 2) ? -1.0 : 1.0;
-				f64 coefficient = V[m1][m2][m3][m4];
-				
-				sz indexNext = getIndex(states, {upNext, downNext});
-				
-				rows.push(index); cols.push(indexNext); data.push(0.5*parity*coefficient);
-			}
-			*/
 		}
 		
 	}
@@ -287,7 +244,7 @@ i32 main()
 		data = dataUnique;
 	}
 
-	std::cout << (isSymmetric(rows, cols, data) ? "Symmetric" : "Not symmetric") << std::endl;
+	// std::cout << (isSymmetric(rows, cols, data) ? "Symmetric" : "Not symmetric") << std::endl;
 
 	sz nEigenvalues = 6;
 	
@@ -296,6 +253,7 @@ i32 main()
 	for (sz i = 0; i < rows.size(); ++i) triplets.push_back(Eigen::Triplet<f64>(rows[i], cols[i], data[i]));
 	sparse.setFromTriplets(triplets.begin(), triplets.end());
 
+	/*
 	Eigen::MatrixXd dense = sparse;
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solverDense(dense);
 	std::vector<f64> eigenvaluesDense(nEigenvalues);
@@ -303,6 +261,7 @@ i32 main()
 	std::cout << "Eigenvalues (Eigen): " << eigenvaluesDense << std::endl;
 
 	return 0;
+	*/
 	
 
 	Spectra::SparseSymMatProd<f64> op(sparse);
