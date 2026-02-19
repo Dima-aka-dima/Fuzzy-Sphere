@@ -25,11 +25,11 @@ auto wigner3j = gsl_sf_coupling_3j;
 
 
 // Assumes `s` is integer (for now)
-const i32 N = 11; // |[s, s-1, ..., -s+1, -s]| = 2s + 1 = N, \sum_{m = -s}^s c^\dagger_m c_m = N  -- half-filling
+const i32 N = 5; // |[s, s-1, ..., -s+1, -s]| = 2s + 1 = N, \sum_{m = -s}^s c^\dagger_m c_m = N  -- half-filling
 const i32 M = 0; // \sum_{m = -s}^s m c^\dagger_m c_m 
 const i32 S = N / 2;
 
-const f64 h = 1.0;
+const f64 h  = 1.0;
 const f64 V0 = 1.0;
 const f64 V1 = 4.0;
 
@@ -59,6 +59,7 @@ table_t makeCoefficients()
 		C1 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m1, 2*m2, 2*(-m1-m2)); 
 		C2 = gsl::wigner3j(2*S, 2*S, 2*(2*S-l), 2*m4, 2*m3, 2*(-m3-m4)); 
 		table[m1+S][m2+S][m3+S][m4+S] += 2*V1*f64(4*S-2*l+1)*C1*C2;
+		// std::cout << table[m1+S][m2+S][m3+S][m4+S] << std::endl;
 	}	
 
 	return table;
@@ -98,19 +99,70 @@ i32 getM(state_t up, state_t down)
 	return res;
 }
 
-sz getParity(state_t state, sz m1, sz m2)
+// m != n
+sz getPhase(state_t state, sz m, sz n)
+{
+	if(m > n) std::swap(m, n);
+	state_t mask = ((state_t(1) << (m+1)) - 1) ^ ((state_t(1) << n) - 1);
+	state &= mask;
+	return std::popcount(state);
+}
+
+sz getPhase(state_t up, state_t down, sz m, sz n)
+{
+	if(m > n) std::swap(m, n);
+	state_t mask = ((state_t(1) << (m+1)) - 1) ^ ((state_t(1) << n) - 1);
+	// return std::popcount((up & mask) | (down & mask));
+	return std::popcount((up | down) & mask);
+}
+
+/*
+sz getPhase(state_t state, sz m1, sz m2)
 {
 	sz parity = 0;
 	if(m1 > m2) std::swap(m1, m2);
-	for(sz i = m1 + 1; i < m2; ++i) if(get(state, i)) parity++;
+	for(sz i = m1+1; i < m2; ++i) if(get(state, i)) parity++;
 	// for (sz i = (m1 < m2 ? m1 : m2) + 1; i < (m1 < m2 ? m2 : m1); ++i) if (get(state, i)) parity++;
 	return parity;
 }
+*/
+
+bool isUnique(std::vector<sz>& rows, std::vector<sz>& cols, sz n)
+{
+	std::unordered_map<sz, bool> values;
+	for(sz i = 0; i < rows.size(); i++)
+	{
+		sz ind = rows[i]*n + cols[i];
+		if(values.find(ind) != values.end()) { return false; }
+		values[ind] = true;
+	}
+
+	return true;
+}
+
+bool isSymmetric(std::vector<sz>& rows, std::vector<sz>& cols, std::vector<f64>& data)
+{
+	for(sz i = 0; i < rows.size(); i++)
+	{
+		if(rows[i] == cols[i]) continue;
+
+		sz it = rows.size();
+		for(sz j = 0; j < rows.size(); j++)
+		{
+			if(rows[i] == cols[j] and rows[j] == cols[i]) {it = j; break;}
+		}
+		if(it == rows.size())   { std::cout << "Here!\n"; return false; } 
+		if(std::abs(data[i] - data[it]) > 1e-6) { std::cout << "here: " << data[i] - data[it] << std::endl; return false; }
+	}
+
+	return true;
+}
+
 
 i32 main()
 {
 	static_assert(2*S+1 == N);
-	static_assert(N <= 15);
+
 	std::cout << "S = " << S << ", N = " << N << ", M = " << M << std::endl;
 	
 	std::vector<std::pair<state_t, state_t>> states;
@@ -127,10 +179,10 @@ i32 main()
 	for(sz index = 0; index < states.size(); index++)
 	{
 		auto [up, down] = states[index];
-		/*
+		
+		// c^\dagger_{m,\uparrow}c_{m, \downarrow} + c^\dagger_{m,\downarrow} c_{m, \uparrow}
 		for(i32 m = 0; m < N; m++)
 		{
-			// c^\dagger_{m,\uparrow}c_{m, \downarrow} + c^\dagger_{m,\downarrow} c_{m, \uparrow}
 			if(get(up, m) == get(down, m)) continue;
 
 			state_t upNext = flip(up, m); 
@@ -138,9 +190,7 @@ i32 main()
 			sz indexNext = getIndex(states, {upNext, downNext});
 
 			rows.push(index); cols.push(indexNext); data.push(-h);
-			// rows.push(indexNext); cols.push(index); data.push(-h);
 		}
-		*/
 
 		// Diagonal loop, (m1 == m4) => (m2 == m3)
 		f64 diagonal = 0;
@@ -173,19 +223,71 @@ i32 main()
 				state_t downNext = flip(flip(down, m4), m1);
 				state_t upNext   = flip(flip(up  , m3), m2);
 
-				sz parity = getParity(down, m1, m4) + getParity(up, m2, m3);
-				f64 phase = (parity % 2) ? -1.0 : 1.0;
+				sz phase1 = getPhase(down, m2, m3) + getPhase(up, m2, m3) + sz(get(down, std::min(m2, m3)));
+				sz phase2 = getPhase(down, m1, m4) + getPhase(upNext, m1, m4) + sz(get(upNext, std::max(m1, m4)));
+				// sz phase1 = getPhase(up, down, m2, m3) + sz(get(down, std::min(m2, m3)));
+				// sz phase2 = getPhase(upNext, down, m1, m4) + sz(get(upNext, std::max(m1, m4)));
+				sz phase = phase1 + phase2;
+				f64 parity = (phase % 2) ? -1.0 : 1.0;
 				f64 coefficient = V[m1][m2][m3][m4];
 				
 				sz indexNext = getIndex(states, {upNext, downNext});
 				
-				rows.push(index); cols.push(indexNext); data.push(phase*coefficient);
+				rows.push(index); cols.push(indexNext); data.push(parity*coefficient);
 			}
+		
+			/*
+			// c^\dagger_{m_1,\uparrow} c_{m_4,\uparrow} c^\dagger_{m_2,\downarrow} c_{m_3,\downarrow}
+			if(get(up,   m4) and not get(up,   m1) and\
+			   get(down, m3) and not get(down, m2))
+			{
+				state_t downNext = flip(flip(down, m2), m3);
+				state_t upNext   = flip(flip(up  , m1), m4);
+
+				// sz phase = getPhase(down, m1, m4) + getPhase(up, m2, m3);
+				sz phase1 = getPhase(down, m2, m3) + getPhase(up, m2, m3) + sz(get(up, std::max(m2, m3)));
+				sz phase2 = getPhase(downNext, m1, m4) + getPhase(up, m1, m4) + sz(get(downNext, std::min(m1, m4)));
+				sz phase = phase1 + phase2;
+				f64 parity = (phase % 2) ? -1.0 : 1.0;
+				f64 coefficient = V[m1][m2][m3][m4];
+				
+				sz indexNext = getIndex(states, {upNext, downNext});
+				
+				rows.push(index); cols.push(indexNext); data.push(0.5*parity*coefficient);
+			}
+			*/
 		}
 		
 	}
 	
 	std::cout << "Number of entries in the Hamiltonian: " << data.size() << std::endl;
+	
+	bool _isUnique = isUnique(rows, cols, states.size());
+	std::cout << (_isUnique ? "Unique" : "Not unique") << std::endl;
+	
+	if(not _isUnique)
+	{
+		std::unordered_map<sz, f64> values;
+		for(sz i = 0; i < rows.size(); i++) 
+			values[rows[i]*states.size() + cols[i]] += data[i];
+
+		std::cout << "Number of unique entries in the Hamiltonian: " << values.size() << std::endl;
+		std::vector<sz> rowsUnique, colsUnique;
+		std::vector<f64> dataUnique;
+
+		for(auto [ind, value]: values)
+		{
+			rowsUnique.push(ind / states.size());
+			colsUnique.push(ind % states.size());
+			dataUnique.push(value);
+		}
+		
+		rows = rowsUnique;
+		cols = colsUnique;
+		data = dataUnique;
+	}
+
+	std::cout << (isSymmetric(rows, cols, data) ? "Symmetric" : "Not symmetric") << std::endl;
 
 	sz nEigenvalues = 6;
 	
@@ -194,14 +296,14 @@ i32 main()
 	for (sz i = 0; i < rows.size(); ++i) triplets.push_back(Eigen::Triplet<f64>(rows[i], cols[i], data[i]));
 	sparse.setFromTriplets(triplets.begin(), triplets.end());
 
-	/*
 	Eigen::MatrixXd dense = sparse;
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solverDense(dense);
 	std::vector<f64> eigenvaluesDense(nEigenvalues);
 	for(sz i = 0; i < nEigenvalues; i++) eigenvaluesDense[i] = solverDense.eigenvalues()[i];
 	std::cout << "Eigenvalues (Eigen): " << eigenvaluesDense << std::endl;
+
 	return 0;
-	*/
+	
 
 	Spectra::SparseSymMatProd<f64> op(sparse);
 	Spectra::SymEigsSolver<Spectra::SparseSymMatProd<f64>> solver(op, nEigenvalues, 8*nEigenvalues); solver.init();
